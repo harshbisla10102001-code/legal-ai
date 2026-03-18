@@ -2,27 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLanguage } from "@/lib/i18n";
 
 const nav = [
-  { href: "/dashboard/ai-chat", label: "AI Chat" },
-  { href: "/dashboard/document-review", label: "Document Review" },
-  { href: "/dashboard/contract-generator", label: "Contract Generator" },
-  { href: "/dashboard/legal-research", label: "Legal Research" },
-  { href: "/dashboard/risk-analysis", label: "Risk Analysis" },
-  { href: "/dashboard/settings", label: "Settings" },
+  { href: "/dashboard/ai-chat", labelKey: "nav.ai_chat" },
+  { href: "/dashboard/document-review", labelKey: "nav.document_review" },
+  { href: "/dashboard/contract-generator", labelKey: "nav.contract_generator" },
+  { href: "/dashboard/legal-research", labelKey: "nav.legal_research" },
+  { href: "/dashboard/risk-analysis", labelKey: "nav.risk_analysis" },
+  { href: "/dashboard/settings", labelKey: "nav.settings" },
 ] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { t } = useLanguage();
 
   return (
     <aside className="flex h-full w-full flex-col gap-2 border-r border-black/10 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-white/5">
       <div className="flex items-center justify-between gap-2">
         <Link href="/dashboard" className="text-sm font-semibold">
-          LegalAI
+          {t("nav.brand")}
         </Link>
         <span className="rounded-full border border-black/10 px-2 py-0.5 text-[11px] text-zinc-600 dark:border-white/10 dark:text-zinc-300">
-          Lawyer
+          {t("nav.role")}
         </span>
       </div>
 
@@ -41,7 +43,7 @@ export function Sidebar() {
                   : "text-zinc-700 hover:bg-black/5 dark:text-zinc-300 dark:hover:bg-white/10",
               ].join(" ")}
             >
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           );
         })}
@@ -52,10 +54,9 @@ export function Sidebar() {
           type="submit"
           className="w-full rounded-lg border border-black/10 px-3 py-2 text-sm font-medium hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
         >
-          Sign out
+          {t("nav.sign_out")}
         </button>
       </form>
     </aside>
   );
 }
-

@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as {
       messages: { role: "user" | "assistant"; content: string }[];
+      language?: "en" | "hi";
     };
 
     if (!body?.messages?.length) {
@@ -83,6 +84,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isHindi = body.language === "hi";
+
+    const systemPrompt = isHindi
+      ? "आप LegalAI हैं, एक सहायक जो वकीलों को ड्राफ्टिंग और विश्लेषण में मदद करता है। " +
+        "आप एक कानूनी फर्म नहीं हैं और आपके उत्तर केवल सूचनात्मक उद्देश्यों के लिए हैं। " +
+        "कृपया हमेशा हिंदी में उत्तर दें।"
+      : "You are LegalAI, an assistant helping lawyers with drafting and analysis. " +
+        "You are not a law firm and your outputs are for informational purposes only.";
+
     const groq = new Groq({ apiKey });
 
     const response = await groq.chat.completions.create({
@@ -90,12 +100,7 @@ export async function POST(request: NextRequest) {
       max_tokens: 512,
       temperature: 0.2,
       messages: [
-        {
-          role: "system",
-          content:
-            "You are LegalAI, an assistant helping lawyers with drafting and analysis. " +
-            "You are not a law firm and your outputs are for informational purposes only.",
-        },
+        { role: "system", content: systemPrompt },
         ...body.messages.map((m) => ({ role: m.role, content: m.content })),
       ],
     });

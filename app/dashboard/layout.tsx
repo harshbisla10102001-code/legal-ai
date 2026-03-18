@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "./_components/Sidebar";
-import { ThemeToggle } from "./_components/ThemeToggle";
+import { DashboardHeader } from "./_components/DashboardHeader";
 import { ChatProvider } from "./_components/ChatProvider";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -22,7 +22,6 @@ export default async function DashboardLayout({
     .eq("id", user.id)
     .maybeSingle();
 
-  // Middleware already blocks unauthorized users, but keep this resilient.
   if (!profile || (profile.role !== "lawyer" && profile.role !== "admin")) {
     redirect("/unauthorized");
   }
@@ -41,21 +40,7 @@ export default async function DashboardLayout({
         </div>
 
         <div className="flex min-w-0 flex-col">
-          <header className="sticky top-0 z-10 border-b border-black/10 bg-white/70 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-white/5">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
-              <div className="flex min-w-0 flex-col">
-                <div className="text-xs text-zinc-600 dark:text-zinc-400">
-                  Lawyer dashboard
-                </div>
-                <div className="truncate text-sm font-semibold">
-                  Welcome, {name}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <ThemeToggle />
-              </div>
-            </div>
-          </header>
+          <DashboardHeader name={name} />
 
           <main className="mx-auto w-full max-w-6xl flex-1 p-4">
             <div className="md:hidden">
@@ -70,4 +55,3 @@ export default async function DashboardLayout({
     </div>
   );
 }
-
