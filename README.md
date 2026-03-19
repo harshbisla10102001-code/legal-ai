@@ -27,7 +27,7 @@ values ('YOUR_AUTH_USER_ID', 'Your Name', 'lawyer');
 
 ### Running the dev server
 
-First, run the development server:s
+First, run the development server:sf
 
 ```bash
 npm run dev

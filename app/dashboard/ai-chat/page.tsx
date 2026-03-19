@@ -3,6 +3,7 @@
 import { useRef, useEffect } from "react";
 import { useChat } from "../_components/ChatProvider";
 import { useLanguage } from "@/lib/i18n";
+import { sendAiChat, ApiRequestError } from "@/lib/hooks/use-api";
 
 export default function AiChatPage() {
   const {
@@ -57,27 +58,13 @@ export default function AiChatPage() {
     const allMessages = [...messages, userMsg];
 
     try {
-      const res = await fetch("/api/ai-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: allMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          language: locale,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.debug) setDebug(data.debug);
-        throw new Error(data.error || "Request failed");
-      }
-
-      const data = (await res.json()) as { reply: string };
-      await addAssistantMessage(data.reply);
+      const reply = await sendAiChat(
+        allMessages.map((m) => ({ role: m.role, content: m.content })),
+        locale,
+      );
+      await addAssistantMessage(reply);
     } catch (err) {
+      if (err instanceof ApiRequestError && err.debug) setDebug(err.debug);
       setError(err instanceof Error ? err.message : t("chat.error_fallback"));
     } finally {
       setLoading(false);
@@ -85,7 +72,7 @@ export default function AiChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-6rem)] gap-3">
+    <div className="flex h-[calc(100vh-5rem)] gap-3 sm:h-[calc(100vh-6rem)]">
       {/* Session sidebar */}
       <div className="hidden w-56 flex-col rounded-2xl border border-black/10 bg-white/70 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 md:flex">
         <div className="mb-3 flex items-center justify-between">
@@ -139,7 +126,7 @@ export default function AiChatPage() {
       </div>
 
       {/* Chat area */}
-      <div className="flex min-w-0 flex-1 flex-col rounded-2xl border border-black/10 bg-white/70 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
+      <div className="flex min-w-0 flex-1 flex-col rounded-2xl border border-black/10 bg-white/70 p-3 shadow-sm backdrop-blur sm:p-5 dark:border-white/10 dark:bg-white/5">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
@@ -203,7 +190,7 @@ export default function AiChatPage() {
                 className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-3 py-2 ${
+                  className={`max-w-[90%] rounded-2xl px-3 py-2 sm:max-w-[80%] ${
                     m.role === "user"
                       ? "bg-black text-white dark:bg-white dark:text-black"
                       : "bg-zinc-100 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50"

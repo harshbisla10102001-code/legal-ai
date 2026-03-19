@@ -13,14 +13,18 @@ const nav = [
   { href: "/dashboard/settings", labelKey: "nav.settings" },
 ] as const;
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const pathname = usePathname();
   const { t } = useLanguage();
 
   return (
     <aside className="flex h-full w-full flex-col gap-2 border-r border-black/10 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-white/5">
       <div className="flex items-center justify-between gap-2">
-        <Link href="/dashboard" className="text-sm font-semibold">
+        <Link
+          href="/dashboard"
+          onClick={onNavigate}
+          className="text-sm font-semibold"
+        >
           {t("nav.brand")}
         </Link>
         <span className="rounded-full border border-black/10 px-2 py-0.5 text-[11px] text-zinc-600 dark:border-white/10 dark:text-zinc-300">
@@ -36,6 +40,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={[
                 "rounded-lg px-3 py-2 text-sm transition-colors",
                 active

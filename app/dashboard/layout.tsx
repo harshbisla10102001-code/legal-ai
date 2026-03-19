@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { Sidebar } from "./_components/Sidebar";
-import { DashboardHeader } from "./_components/DashboardHeader";
+import { DashboardShell } from "./_components/DashboardShell";
 import { ChatProvider } from "./_components/ChatProvider";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -33,25 +32,8 @@ export default async function DashboardLayout({
     "there";
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[260px_1fr]">
-        <div className="hidden md:block">
-          <Sidebar />
-        </div>
-
-        <div className="flex min-w-0 flex-col">
-          <DashboardHeader name={name} />
-
-          <main className="mx-auto w-full max-w-6xl flex-1 p-4">
-            <div className="md:hidden">
-              <div className="mb-4">
-                <Sidebar />
-              </div>
-            </div>
-            <ChatProvider>{children}</ChatProvider>
-          </main>
-        </div>
-      </div>
-    </div>
+    <DashboardShell name={name}>
+      <ChatProvider>{children}</ChatProvider>
+    </DashboardShell>
   );
 }

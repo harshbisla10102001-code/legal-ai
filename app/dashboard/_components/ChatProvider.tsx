@@ -6,34 +6,17 @@ import {
   useContext,
   useEffect,
   useState,
-  useRef,
   type ReactNode,
 } from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-
-function randomId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-export type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-};
-
-export type ChatSession = {
-  id: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-};
+import type { ChatMessage, ChatSession } from "@/types";
+import {
+  fetchSessions,
+  createSessionApi,
+  updateSessionApi,
+  deleteSessionApi,
+  fetchMessages,
+  createMessageApi,
+} from "@/lib/hooks/use-api";
 
 type ChatContextValue = {
   sessions: ChatSession[];
@@ -60,9 +43,6 @@ type ChatContextValue = {
 const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const supabase = useRef(createSupabaseBrowserClient()).current;
-
-  const [userId, setUserId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -72,88 +52,67 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<Record<string, unknown> | null>(null);
 
+  // Load sessions on mount
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
-    });
-  }, [supabase]);
-
-  useEffect(() => {
-    if (!userId) return;
     setSessionsLoading(true);
-    supabase
-      .from("chat_sessions")
-      .select("id, title, created_at, updated_at")
-      .eq("user_id", userId)
-      .order("updated_at", { ascending: false })
-      .then(({ data }) => {
-        const list = (data ?? []) as ChatSession[];
+    fetchSessions()
+      .then((list) => {
         setSessions(list);
-        if (list.length > 0 && !activeSessionId) {
-          setActiveSessionId(list[0].id);
-        }
-        setSessionsLoading(false);
-      });
-    // Only run on userId change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+        if (list.length > 0) setActiveSessionId(list[0].id);
+      })
+      .catch(() => {})
+      .finally(() => setSessionsLoading(false));
+  }, []);
 
+  // Load messages when active session changes
   useEffect(() => {
     if (!activeSessionId) {
       setMessages([]);
       return;
     }
-    supabase
-      .from("chat_messages")
-      .select("id, role, content")
-      .eq("session_id", activeSessionId)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        setMessages((data ?? []) as ChatMessage[]);
-      });
-  }, [activeSessionId, supabase]);
+    fetchMessages(activeSessionId)
+      .then(setMessages)
+      .catch(() => setMessages([]));
+  }, [activeSessionId]);
 
   const createSession = useCallback(async (): Promise<string | null> => {
-    if (!userId) return null;
-    const { data, error: err } = await supabase
-      .from("chat_sessions")
-      .insert({ user_id: userId, title: "New chat" })
-      .select("id, title, created_at, updated_at")
-      .single();
-    if (err || !data) return null;
-    const session = data as ChatSession;
-    setSessions((prev) => [session, ...prev]);
-    setActiveSessionId(session.id);
-    setMessages([]);
-    setInput("");
-    setError(null);
-    setDebug(null);
-    return session.id;
-  }, [userId, supabase]);
-
-  const switchSession = useCallback(
-    async (sessionId: string) => {
-      setActiveSessionId(sessionId);
+    try {
+      const session = await createSessionApi();
+      setSessions((prev) => [session, ...prev]);
+      setActiveSessionId(session.id);
+      setMessages([]);
       setInput("");
       setError(null);
       setDebug(null);
-    },
-    [],
-  );
+      return session.id;
+    } catch {
+      return null;
+    }
+  }, []);
 
-  const deleteSession = useCallback(
+  const switchSession = useCallback(async (sessionId: string) => {
+    setActiveSessionId(sessionId);
+    setInput("");
+    setError(null);
+    setDebug(null);
+  }, []);
+
+  const deleteSessionHandler = useCallback(
     async (sessionId: string) => {
-      await supabase.from("chat_sessions").delete().eq("id", sessionId);
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      if (activeSessionId === sessionId) {
-        setSessions((prev) => {
-          const remaining = prev.filter((s) => s.id !== sessionId);
-          setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
-          return remaining;
-        });
+      try {
+        await deleteSessionApi(sessionId);
+      } catch {
+        return;
       }
+      setSessions((prev) => {
+        const remaining = prev.filter((s) => s.id !== sessionId);
+        if (activeSessionId === sessionId) {
+          setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
+        }
+        return remaining;
+      });
     },
-    [supabase, activeSessionId],
+    [activeSessionId],
   );
 
   const updateSessionTitle = useCallback(
@@ -162,15 +121,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         firstMessage.length > 50
           ? firstMessage.slice(0, 50) + "…"
           : firstMessage;
-      await supabase
-        .from("chat_sessions")
-        .update({ title })
-        .eq("id", sessionId);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, title } : s)),
-      );
+      try {
+        await updateSessionApi(sessionId, title);
+        setSessions((prev) =>
+          prev.map((s) => (s.id === sessionId ? { ...s, title } : s)),
+        );
+      } catch {
+        // Non-critical, swallow
+      }
     },
-    [supabase],
+    [],
   );
 
   const addUserMessage = useCallback(
@@ -182,46 +142,33 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         if (!sessionId) return null;
       }
 
-      const id = randomId();
-      const msg: ChatMessage = { id, role: "user", content };
+      try {
+        const msg = await createMessageApi(sessionId, "user", content);
 
-      setMessages((prev) => {
-        const isFirst = prev.length === 0;
-        if (isFirst) updateSessionTitle(sessionId!, content);
-        return [...prev, msg];
-      });
+        setMessages((prev) => {
+          if (prev.length === 0) updateSessionTitle(sessionId!, content);
+          return [...prev, msg];
+        });
 
-      await supabase
-        .from("chat_messages")
-        .insert({ id, session_id: sessionId, role: "user", content });
-
-      await supabase
-        .from("chat_sessions")
-        .update({ updated_at: new Date().toISOString() })
-        .eq("id", sessionId);
-
-      return msg;
+        return msg;
+      } catch {
+        return null;
+      }
     },
-    [activeSessionId, createSession, supabase, updateSessionTitle],
+    [activeSessionId, createSession, updateSessionTitle],
   );
 
   const addAssistantMessage = useCallback(
     async (content: string) => {
       if (!activeSessionId) return;
-      const id = randomId();
-      const msg: ChatMessage = { id, role: "assistant", content };
-      setMessages((prev) => [...prev, msg]);
-
-      await supabase
-        .from("chat_messages")
-        .insert({
-          id,
-          session_id: activeSessionId,
-          role: "assistant",
-          content,
-        });
+      try {
+        const msg = await createMessageApi(activeSessionId, "assistant", content);
+        setMessages((prev) => [...prev, msg]);
+      } catch {
+        // Non-critical: message already shown locally; log would go here
+      }
     },
-    [activeSessionId, supabase],
+    [activeSessionId],
   );
 
   const value: ChatContextValue = {
@@ -241,7 +188,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     createSession,
     switchSession,
-    deleteSession,
+    deleteSession: deleteSessionHandler,
     addUserMessage,
     addAssistantMessage,
   };
